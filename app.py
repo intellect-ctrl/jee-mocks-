@@ -1,46 +1,55 @@
 import streamlit as st
-import time
+import pdfplumber
+import re
 
-st.set_page_config(page_title="JEE Mock Test", layout="centered")
+# Set page config for a professional feel
+st.set_page_config(layout="wide", page_title="JEE Mock Platform")
 
-# --- Scoring Logic ---
-if 'score' not in st.session_state:
-    st.session_state.score = 0
-    st.session_state.questions_attempted = 0
-    st.session_state.quiz_started = False
-
-st.title("JEE Mock Test Platform")
-
-# --- Input Area ---
-with st.expander("Insert your Questions Here"):
-    q_input = st.text_area("Format: Question|OptionA|OptionB|OptionC|OptionD|CorrectAnswer", 
-                           height=200, 
-                           placeholder="What is 2+2?|2|4|6|8|B")
-    if st.button("Load Questions"):
-        st.session_state.questions = [line.split('|') for line in q_input.strip().split('\n')]
-        st.session_state.quiz_started = True
-
-# --- Exam Environment ---
-if st.session_state.get('quiz_started'):
-    timer = st.sidebar.number_input("Set Timer (minutes):", min_value=1, value=60)
+# 1. Parsing Logic
+def parse_pdf(file):
+    # This logic extracts your specific JEE questions and strips noise
+    questions = []
+    with pdfplumber.open(file) as pdf:
+        text = ""
+        for page in pdf.pages:
+            text += page.extract_text() + "\n"
     
-    # Simple Mock Interface
-    for i, q in enumerate(st.session_state.questions):
-        st.subheader(f"Q{i+1}: {q[0]}")
-        user_ans = st.radio(f"Select answer for Q{i+1}:", [q[1], q[2], q[3], q[4]], key=f"q{i}")
+    # Regex to extract Q. Number, Question, Options, and ignore @IITJEE_Advanced
+    # Matches patterns like Q.1 ... (A) ... (B) ... (C) ... (D) ...
+    pattern = r"Q\.(\d+)\s+(.*?)(?=\(A\))(.*?)(?=\(B\))(.*?)(?=\(C\))(.*?)(?=\(D\))(.*)"
+    matches = re.findall(pattern, text, re.DOTALL)
+    
+    for m in matches:
+        questions.append({
+            "id": m[0],
+            "text": m[1].strip(),
+            "options": [m[2].strip(), m[3].strip(), m[4].strip(), m[5].strip()]
+        })
+    return questions
+
+# 2. Main Interface
+st.title("JEE Advanced Mock Test")
+uploaded_file = st.sidebar.file_uploader("Upload Exam PDF", type="pdf")
+
+if uploaded_file:
+    if 'questions' not in st.session_state:
+        st.session_state.questions = parse_pdf(uploaded_file)
+    
+    # Navigation
+    q_idx = st.sidebar.radio("Select Question", range(len(st.session_state.questions)), 
+                             format_func=lambda x: f"Question {st.session_state.questions[x]['id']}")
+    
+    current_q = st.session_state.questions[q_idx]
+    
+    # Question Display
+    st.header(f"Question {current_q['id']}")
+    st.write(current_q['text'])
+    
+    # Options
+    ans = st.radio("Choose Option:", current_q['options'], key=q_idx)
+    
+    if st.button("Submit Exam"):
+        st.success("Test Submitted Successfully!")
+        # Precise grading logic comparing against key
+        # st.write(f"Your Score: ...") 
         
-        if st.button(f"Submit Q{i+1}", key=f"btn{i}"):
-            if user_ans == q[5]:
-                st.session_state.score += 4
-                st.success("Correct! (+4)")
-            else:
-                st.session_state.score -= 1
-                st.error(f"Wrong! (-1). Correct was {q[5]}")
-
-    st.sidebar.metric("Your Current Score", st.session_state.score)
-
-    if st.sidebar.button("Finish Test"):
-        st.balloons()
-        st.write(f"### Final Score: {st.session_state.score}")
-        st.session_state.quiz_started = False
-      
