@@ -1,47 +1,56 @@
+
 import streamlit as st
 import time
 
-# Question Bank (Insert your questions here)
+# --- 1. CONFIGURATION ---
+st.set_page_config(layout="wide", page_title="JEE Advanced Test")
+
+# --- 2. QUESTION BANK ---
 questions = [
     {
-        "q": "Let f(x) be continuous on [a, c] and differentiable in (a, c)...",
+        "id": 1,
+        "text": "Let f(x) be continuous on [a, c] and differentiable in (a, c)...",
         "options": ["k > (c-a)f(b)", "k < (c-a)f(b)", "k = (c-a)f(b)", "k < 2(c-a)f(b)"],
         "answer": "k > (c-a)f(b)"
     },
     {
-        "q": "Let f(x) = x^2 + mx + n + 2... Rolle's Theorem at x = 4/3...",
+        "id": 2,
+        "text": "Let f(x) = x^2 + mx + n + 2... Rolle's Theorem at x = 4/3...",
         "options": ["1", "2", "3", "4"],
         "answer": "3"
     }
 ]
 
-st.set_page_config(layout="wide")
+# --- 3. SESSION STATE ---
+if 'user_answers' not in st.session_state:
+    st.session_state.user_answers = {}
+if 'start_time' not in st.session_state:
+    st.session_state.start_time = time.time()
+
+# --- 4. TIMER & UI ---
 st.title("JEE Advanced Mock Test")
+elapsed = time.time() - st.session_state.start_time
+remaining = max(0, 1800 - elapsed) # 30 min timer
+st.sidebar.metric("Time Remaining", f"{int(remaining//60)}:{int(remaining%60):02d}")
 
-# Timer Logic
-if 'timer' not in st.session_state:
-    st.session_state.timer = 1800 # 30 minutes in seconds
+# --- 5. QUESTION DISPLAY ---
+for q in questions:
+    st.write(f"### Q.{q['id']}: {q['text']}")
+    # Radio button for answering
+    choice = st.radio("Choose Option:", q['options'], key=f"q{q['id']}", index=None)
+    st.session_state.user_answers[q['id']] = choice
+    st.divider()
 
-# Display Timer
-mins, secs = divmod(st.session_state.timer, 60)
-st.sidebar.metric("Time Remaining", f"{mins:02d}:{secs:02d}")
-
-# State for answers
-if 'answers' not in st.session_state:
-    st.session_state.answers = {}
-
-# Quiz Interface
-for i, q in enumerate(questions):
-    st.subheader(f"Q.{i+1}")
-    choice = st.radio(q['q'], q['options'], key=f"q{i}")
-    st.session_state.answers[i] = choice
-
-if st.button("Submit & Analyze"):
+# --- 6. SUBMISSION & ANALYSIS ---
+if st.button("Final Submit Test"):
     score = 0
-    for i, q in enumerate(questions):
-        if st.session_state.answers[i] == q['answer']:
+    for q in questions:
+        if st.session_state.user_answers.get(q['id']) == q['answer']:
             score += 4
-        else:
+        elif st.session_state.user_answers.get(q['id']) is not None:
             score -= 1
-    st.success(f"Test Finished! Your Score: {score}")
+    
+    st.balloons()
+    st.header(f"Your Total Score: {score} / {len(questions) * 4}")
+    st.write("Analysis: Precise evaluation based on JEE marking (+4/-1).")
     
